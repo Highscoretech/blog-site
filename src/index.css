@@ -3,3 +3,29 @@
     height: 1.4em;
     fill: rgba(153, 164, 176, 0.6);
 }
+.app-container{
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #18181b;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+.app-section{
+    margin-top: 70px;
+}
+.home{
+    margin-top: 10px;
+}
+.home .slide-img{
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 10px;
+    background: red;
+}
+.home .slide-img img{
+    width: 100%;
+    height: 100%;
+    border-radius: 9px;
+}
