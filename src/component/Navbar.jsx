@@ -10,7 +10,7 @@ export default function Navbar() {
     <header className="navbar">
         <div className="navbar-container">
             <div className="navbar-logo">
-                <img width="261" height="108" src="https://lightmatter.co/wp-content/uploads/2024/02/LM_Monogram_Registered_Select_20230221.svg" alt="Logo" />
+                <img width="261" height="108" src="/assets/LM_Monogram_Registered_Select_20230221.svg" alt="Logo" />
             </div>
             <ul className="navbar-menu">
                 <li><a href="#home">HOME</a></li>
