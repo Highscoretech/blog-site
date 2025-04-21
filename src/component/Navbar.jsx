@@ -13,7 +13,10 @@ export default function Navbar() {
                 <img width="261" height="108" src="/assets/LM_Monogram_Registered_Select_20230221.svg" alt="Logo" />
             </div>
             <ul className="navbar-menu">
-                <li><a href="#home">HOME</a></li>
+                <li>
+                    <a href="#home">HOME</a>
+                    <div></div>
+                </li>
                 <li><a href="#about">ABOUT</a></li>
                 <li><a href="#contact">CONTACT US</a></li>
                 {/* <li><a  href="#post-blog"></a></li> */}

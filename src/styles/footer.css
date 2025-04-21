@@ -1,0 +1,85 @@
+#site-footer{
+    width: 100%;
+    margin-top: 80px;
+    position: relative;
+}
+#site-footer .fotter-container {
+    padding: 50px;
+    background: rgb(24 24 27 / 1);
+    color: var(--text-color);
+}
+#site-footer .fotter-container > div{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.logo-section{
+    display: flex;
+    flex-direction: column;
+    width: 35%;
+    gap: 20px;
+}
+.logo-section img{
+    width: 70px;
+}
+.rpute-sectisjkS{
+    position: relative;
+    display: flex;
+    width: 70%;
+    justify-content: space-between;
+    margin: 0 20px;
+}
+.rokJHSei h3{
+    color: #fff;
+}
+.rokJHSei ul{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.rokJHSei ul li{
+    margin: 10px 0;
+}
+.rokJHSei ul li > a:hover{
+    color: #fff;
+}
+#site-footer .line{
+    width: 100%;
+    height: 1px;
+    background: #ffffff0f;
+    margin: 20px 0;
+}
+.stay-connected{
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.stay-connected .right{
+    display: flex;
+    gap: 10px;
+}
+.stay-connected .right > div{
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+}
+.stay-connected .right > div:before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 0;
+    color: rgb(0 0 0 / .09);
+    content: attr(data-background-text);
+    font-size: 60px;
+    line-height: 1;
+    transform: translateY(-50%);
+}
+.stay-connected .right svg {
+    width: 19px;
+    height: 19px;
+    cursor: pointer;
+    transition: all .3s ease;
+    fill: var(--text-color);
+    margin-top: 4px;
+}

@@ -12,32 +12,54 @@
 .navbar-logo {
     display: flex;
     align-items: center;
-    font-size: 24px;
+    font-size: 16px;
     font-weight: bold;
     color: var(--text-color);
 }
 .navbar-logo img {
-    width: 70px;
-    height: 70px;
+    width: 60px;
+    height: 60px;
     margin-right: 50px;
 }
 .navbar-menu{
     display: flex;
     align-items: center;
-    gap: 20px;
-    font-size: 15px;
+    gap: 10px;
+    font-size: 13px;
     font-weight: 500;
+    list-style: none;
+    letter-spacing: 1px;
+}
+.navbar-menu li {
+    margin: 0 20px;
 }
 .navbar-menu li a{
+    position: relative;
+    display: inline-block;
     text-decoration: none;
     color: rgb(255 255 255 / 0.7);
-    padding: 10px 20px;
+    padding: 10px 0px;
     border-radius: 5px;
     transition: background-color 0.3s ease;
 }
 .navbar-menu li a:hover{
     color: rgb(255 255 255 );
 }
+.navbar-menu li a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    width: 100%;
+    background: rgb(255 45 32 / 1);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease-in-out;
+  }
+  .navbar-menu li a:hover::after {
+    transform: scaleX(1);
+  }
 .navbar-menu li .btn{
     /* border: 1px solid var(--text-color); */
     border-radius: 30px;
