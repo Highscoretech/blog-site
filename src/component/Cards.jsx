@@ -1,143 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowRight, FaEye, FaBookmark, FaShare, FaClock } from "react-icons/fa";
-import { blogs } from '../constants';
+import { useApp } from '../context/AppContext';
+import { api } from '../services/apiClient';
+import { FaClock, FaClipboardList } from "react-icons/fa";
 import { formatDistanceToNow } from 'date-fns';
-import Pagination from '@mui/material/Pagination';
+import { Pagination } from '@mui/material';
+import DOMPurify from 'dompurify';
 
 export default function Cards() {
   const navigate = useNavigate();
+  const { setLoading } = useApp();
+  const [blogs, setBlogs] = useState([]);
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const blogsPerPage = 20;
-  const totalPages = Math.ceil(blogs.length / blogsPerPage);
 
-  const indexOfLastBlog = page * blogsPerPage;
-  const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
-  const currentBlogs = blogs.slice(indexOfFirstBlog, indexOfLastBlog);
+  const createMarkup = (html) => {
+    return {
+      __html: DOMPurify.sanitize(html)
+    };
+  };
 
-  const handlePageChange = (event, value) => {
-    setPage(value);
-    window.scrollTo({ top: document.querySelector('.cards-section').offsetTop - 100, behavior: 'smooth' });
+  const stripHtml = (html) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
+
+  useEffect(() => {
+    fetchBlogs();
+  }, [page]);
+
+  const fetchBlogs = async () => {
+    setLoading(true);
+    try {
+      const response = await api.getBlogs({
+        status: 'approved',
+        page,
+        limit: blogsPerPage
+      });
+      setBlogs(response.data.blogs);
+      setTotalPages(response.data.totalPages);
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBlogClick = (blogId) => {
     navigate(`/blog-details/${blogId}`);
   };
 
+  const handlePageChange = (event, value) => {
+    setPage(value);
+  };
+
+  const handlePostBlog = () => {
+    navigate('/blog');
+  };
+
+  if (blogs.length === 0) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+        <div className="bg-white rounded-2xl p-8 shadow-[0_2px_10px_rgba(0,0,0,0.08)] text-center max-w-md w-full">
+          <FaClipboardList className="mx-auto text-6xl text-gray-300 mb-4" />
+          <h2 className="text-2xl font-bold text-text-primary mb-3">
+            No Blogs Yet
+          </h2>
+          <p className="text-text-secondary mb-6">
+            Be the first one to share your thoughts and ideas with our community.
+          </p>
+          <button
+            onClick={handlePostBlog}
+            className="bg-primary text-white px-6 py-3 rounded-full font-medium
+                     hover:bg-primary/90 transition-colors duration-300
+                     flex items-center justify-center gap-2 mx-auto"
+          >
+            <span>Post Your Blog</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cards-section">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-4">
-        {currentBlogs.map((blog, index) => (
+        {blogs.map((blog) => (
           <article 
-            key={index} 
+            key={blog._id}
             className="group bg-white rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.08)] 
                        hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-all duration-300
                        hover:-translate-y-1 border border-gray-100 cursor-pointer"
-            onClick={() => handleBlogClick(blog.id)}
+            onClick={() => handleBlogClick(blog._id)}
           >
             <div className="p-5">
-              {/* Image and Content Wrapper */}
               <div className="flex gap-4 mb-4">
-                {/* Image Container */}
                 <div className="relative w-32 h-32 flex-shrink-0">
                   <img 
-                    src={blog.img} 
+                    src={blog.images[0]} 
                     alt="" 
                     className="w-full h-full rounded-lg object-cover transform group-hover:scale-105 
                              transition-transform duration-300"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent 
-                               opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                               rounded-lg"/>
                 </div>
-
-                {/* Content Container */}
-                <div className="flex-1">
-                  {/* Title */}
-                  <h3 className="text-lg font-semibold text-text-primary group-hover:text-primary 
-                               transition-colors duration-300 line-clamp-2 cursor-pointer mb-2">
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary mb-2 line-clamp-2">
                     {blog.title}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="text-sm text-text-secondary/80 line-clamp-3">
-                    {blog.desc}
+                  </h2>
+                  <p className="text-text-secondary text-sm line-clamp-2 mb-2">
+                    {stripHtml(blog.content)}
                   </p>
-                </div>
-              </div>
-
-              {/* Metadata & Actions */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                {/* Left side - Date & Views */}
-                <div className="flex items-center gap-4 text-text-secondary/70">
-                  <div className="flex items-center text-xs">
-                    <FaClock className="mr-1.5 text-[10px]" />
-                    <span>{formatDistanceToNow(new Date(blog.date), { 
-                      addSuffix: true,
-                    }).replace('about ', '')}</span>
+                  <div className="flex items-center text-text-secondary/70 text-sm">
+                    <FaClock className="mr-2" />
+                    <span>{formatDistanceToNow(new Date(blog.createdAt), { addSuffix: true })}</span>
                   </div>
-                  <div className="flex items-center text-xs">
-                    <FaEye className="mr-1.5 text-[10px]" />
-                    <span>{Math.floor(Math.random() * 1000)}</span>
-                  </div>
-                </div>
-
-                {/* Right side - Action Buttons */}
-                <div className="flex items-center gap-2">
-                  <button 
-                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors 
-                             text-text-secondary/60 hover:text-primary"
-                    aria-label="Bookmark"
-                  >
-                    <FaBookmark className="text-xs" />
-                  </button>
-                  <button 
-                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors 
-                             text-text-secondary/60 hover:text-primary"
-                    aria-label="Share"
-                  >
-                    <FaShare className="text-xs" />
-                  </button>
-                  <button 
-                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors 
-                             text-primary hover:text-primary/80 group/btn"
-                    aria-label="Read more"
-                  >
-                    <FaArrowRight className="text-xs transition-transform duration-300 
-                                         group-hover/btn:translate-x-1" />
-                  </button>
                 </div>
               </div>
             </div>
           </article>
         ))}
       </div>
-      
-      {/* Pagination */}
-      <div className="flex justify-center mt-12 mb-8">
-        <Pagination 
-          count={totalPages}
-          page={page}
-          onChange={handlePageChange}
-          color="primary"
-          size="large"
-          sx={{
-            '& .MuiPaginationItem-root': {
-              color: '#2C2E3A',
-              '&:hover': {
-                backgroundColor: 'rgba(10, 33, 192, 0.04)',
-              },
-              '&.Mui-selected': {
-                backgroundColor: '#0A21C0',
-                color: '#fff',
-                '&:hover': {
-                  backgroundColor: '#0A21C0',
-                },
-              },
-            },
-          }}
-        />
-      </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center mt-8">
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={handlePageChange}
+            color="primary"
+          />
+        </div>
+      )}
     </div>
   );
 }

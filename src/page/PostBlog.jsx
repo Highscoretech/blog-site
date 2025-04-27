@@ -1,27 +1,94 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import { api } from '../services/apiClient';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import imageCompression from 'browser-image-compression';
+import { toast } from 'sonner';
+import { FaSpinner } from 'react-icons/fa';
 
 const PostBlog = () => {
+  const navigate = useNavigate();
+  const { setLoading } = useApp();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [images, setImages] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
+  const quillRef = useRef(null);
 
-  const modules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      ['blockquote', 'code-block'],
-      ['link'],
-      [{ 'align': [] }],
-      ['clean']
-    ],
+  const clearForm = () => {
+    setTitle('');
+    setContent('');
+    setImages([]);
+    setPreviewImages([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // Clear file input
+    }
+    if (quillRef.current) {
+      quillRef.current.getEditor().setText(''); // Clear Quill editor
+    }
   };
 
-  const handleImageUpload = (e) => {
+  // Memoize the Quill modules configuration
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['blockquote', 'code-block'],
+        ['link'],
+        [{ 'align': [] }],
+        ['clean']
+      ]
+    },
+    clipboard: {
+      matchVisual: false
+    }
+  }), []);
+
+  const formats = useMemo(() => [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'blockquote', 'code-block',
+    'link',
+    'align'
+  ], []);
+
+  const handleContentChange = useCallback((content) => {
+    setContent(content);
+  }, []);
+
+  const compressImage = async (file) => {
+    const options = {
+      maxSizeMB: 1,              // Max file size in MB
+      maxWidthOrHeight: 1920,    // Max width/height in pixels
+      useWebWorker: true,        // Use web worker for better performance
+    };
+    
+    try {
+      const compressedFile = await imageCompression(file, options);
+      return compressedFile;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      return file; // Return original file if compression fails
+    }
+  };
+
+  const convertImageToDataURL = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = useCallback(async (e) => {
     const files = Array.from(e.target.files);
     
     // Preview images
@@ -30,137 +97,156 @@ const PostBlog = () => {
     
     // Store actual files
     setImages(prev => [...prev, ...files]);
-  };
+  }, []);
 
-  const removeImage = (index) => {
+  const removeImage = useCallback((index) => {
     setPreviewImages(prev => prev.filter((_, i) => i !== index));
     setImages(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('content', content);
-    images.forEach((image, index) => {
-      formData.append('images', image);
-    });
+    if (!title || !content || images.length === 0) {
+      toast.error('Please fill in all fields and upload at least one image');
+      return;
+    }
 
-    // TODO: Send to backend
-    console.log('Form submitted:', { title, content, images });
+    setIsSubmitting(true);
+    setLoading(true);
+
+    try {
+      // Compress and convert images to data URLs
+      const compressedImages = await Promise.all(
+        images.map(async (image) => {
+          const compressed = await compressImage(image);
+          return convertImageToDataURL(compressed);
+        })
+      );
+
+      const blogData = {
+        title,
+        content,
+        images: compressedImages
+      };
+
+      await api.createBlog(blogData);
+      toast.success('Blog posted successfully!');
+      clearForm(); // Clear all inputs after successful submission
+      navigate('/blog');
+    } catch (error) {
+      toast.error(error.message || 'Failed to post blog. Please try again.');
+      console.error('Error submitting blog:', error);
+    } finally {
+      setIsSubmitting(false);
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 pt-28 space-y-6">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Create New Blog Post</h1>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Title Input */}
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-            Blog Title
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter your blog title"
-            required
-          />
-        </div>
+    <div className="max-w-4xl mx-auto pt-28 px-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Blog Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter your blog title"
+            />
+          </div>
 
-        {/* Image Upload Section */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Upload Images
-          </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
-            <div className="space-y-1 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                stroke="currentColor"
-                fill="none"
-                viewBox="0 0 48 48"
-                aria-hidden="true"
-              >
-                <path
-                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <div className="flex text-sm text-gray-600">
-                <label
-                  htmlFor="file-upload"
-                  className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                >
-                  <span>Upload files</span>
-                  <input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    ref={fileInputRef}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Images
+            </label>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
+              multiple
+              className="hidden"
+              disabled={isSubmitting}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg 
+                       hover:border-blue-500 transition-colors duration-200 text-gray-600
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting}
+            >
+              Click to upload images
+            </button>
+
+            <div className="mt-4 grid grid-cols-3 gap-4">
+              {previewImages.map((src, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={src}
+                    alt={`Preview ${index + 1}`}
+                    className="h-24 w-full object-cover rounded-lg"
                   />
-                </label>
-                <p className="pl-1">or drag and drop</p>
-              </div>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white 
+                             rounded-full p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSubmitting}
+                  >
+                    <svg className="h-4 w-4" fill="none" strokeLinecap="round" 
+                         strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" 
+                         stroke="currentColor">
+                      <path d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Image Previews */}
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            {previewImages.map((src, index) => (
-              <div key={index} className="relative">
-                <img
-                  src={src}
-                  alt={`Preview ${index + 1}`}
-                  className="h-24 w-full object-cover rounded-lg"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full p-1"
-                >
-                  <svg className="h-4 w-4" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                    <path d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-            ))}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Blog Content
+            </label>
+            <div className="h-64">
+              <ReactQuill
+                ref={quillRef}
+                theme="snow"
+                value={content}
+                onChange={handleContentChange}
+                modules={modules}
+                formats={formats}
+                className="h-full"
+                preserveWhitespace
+                readOnly={isSubmitting}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Rich Text Editor */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Blog Content
-          </label>
-          <ReactQuill
-            value={content}
-            onChange={setContent}
-            modules={modules}
-            className="h-64 mb-12"
-            theme="snow"
-          />
-        </div>
-
-        {/* Submit Button */}
-        <div className="pt-8">
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200"
-          >
-            Publish Blog Post
-          </button>
+          <div className="pt-8">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg 
+                       hover:bg-blue-700 transition duration-200
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <FaSpinner className="animate-spin h-5 w-5" />
+                  <span>Publishing...</span>
+                </>
+              ) : (
+                <span>Publish Blog Post</span>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -168,3 +254,9 @@ const PostBlog = () => {
 };
 
 export default PostBlog;
+
+
+
+
+
+

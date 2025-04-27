@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { FaBars, FaTimes, FaSearch } from "react-icons/fa";
 import SearchModal from './SearchModal';
+import Cookies from 'js-cookie';
 
-const pages = [
+const basePages = [
   { name: 'HOME', path: '/' },
   { name: 'ABOUT', path: '/about' },
   { name: 'CONTACT US', path: '/contact' }
@@ -13,6 +14,7 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,7 +26,13 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Update the search button click handler
+  useEffect(() => {
+    setIsAdmin(Cookies.get('isAdmin') === 'true');
+  }, []);
+
+  // Get pages based on admin status
+  const pages = isAdmin ? [...basePages, { name: 'ADMIN', path: '/admin' }] : basePages;
+
   const handleSearchClick = () => {
     setIsSearchOpen(true);
   };

@@ -1,26 +1,85 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaTimes } from "react-icons/fa";
-import { blogs } from '../constants';
+import { FaTimes, FaSearch, FaSpinner } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
+import { api } from '../services/apiClient';
 
 export default function SearchModal({ isOpen, onClose }) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredBlogs, setFilteredBlogs] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const inputRef = useRef(null);
+  const searchTimeout = useRef(null);
 
   const handleBlogClick = (blogId) => {
+    if (!blogId) return;
     onClose();
     navigate(`/blog-details/${blogId}`);
   };
 
+  const stripHtml = (html) => {
+    if (!html) return '';
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      return doc.body.textContent || '';
+    } catch (error) {
+      console.error('Error stripping HTML:', error);
+      return '';
+    }
+  };
+
+  const searchBlogs = async (term) => {
+    if (!term?.trim()) {
+      setFilteredBlogs([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.searchBlogs(term);
+      const blogs = response?.data?.blogs || [];
+      
+      // Transform the blog data if needed
+      const transformedBlogs = blogs.map(blog => ({
+        ...blog,
+        content: blog.content || '',
+        images: blog.images || [],
+        _id: blog._id || null
+      }));
+      
+      setFilteredBlogs(transformedBlogs);
+    } catch (error) {
+      console.error('Error searching blogs:', error);
+      setError('Failed to search blogs. Please try again.');
+      setFilteredBlogs([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+
+    // Reduced the timeout to 500ms for better responsiveness
+    searchTimeout.current = setTimeout(() => {
+      searchBlogs(value);
+    }, 500);
+  };
+
   useEffect(() => {
-    // Focus input when modal opens
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
     }
 
-    // Disable body scroll when modal is open
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -29,17 +88,11 @@ export default function SearchModal({ isOpen, onClose }) {
 
     return () => {
       document.body.style.overflow = 'unset';
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    // Filter blogs based on search term
-    const filtered = blogs.filter(blog =>
-      blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      blog.desc.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredBlogs(filtered);
-  }, [searchTerm]);
 
   if (!isOpen) return null;
 
@@ -67,7 +120,7 @@ export default function SearchModal({ isOpen, onClose }) {
           ref={inputRef}
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={handleSearchChange}
           placeholder="Search articles..."
           className="w-full px-6 py-4 text-2xl border-none bg-gray-100 rounded-2xl 
                    focus:ring-2 focus:ring-primary/20 focus:outline-none
@@ -78,60 +131,99 @@ export default function SearchModal({ isOpen, onClose }) {
 
       {/* Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        {searchTerm && (
+        {/* Error state */}
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-red-500">{error}</p>
+          </div>
+        )}
+
+        {/* Search prompt state */}
+        {!searchTerm && !error && (
+          <div className="text-center py-20">
+            <FaSearch size={48} className="text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Start typing to search
+            </h3>
+            <p className="text-gray-500">
+              Search for blogs by title or content
+            </p>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="text-center py-20">
+            <FaSpinner size={48} className="text-primary mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Searching...
+            </h3>
+          </div>
+        )}
+
+        {/* Results count */}
+        {searchTerm && !isLoading && !error && (
           <div className="mb-8 text-sm text-gray-500">
             Found {filteredBlogs.length} {filteredBlogs.length === 1 ? 'result' : 'results'} for "{searchTerm}"
           </div>
         )}
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredBlogs.map((blog, index) => (
-            <article 
-              key={index}
-              onClick={() => handleBlogClick(blog.id)}
-              className="group bg-white rounded-2xl overflow-hidden cursor-pointer
-                         shadow-[0_2px_10px_rgba(0,0,0,0.08)] 
-                         hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] 
-                         transition-all duration-300
-                         hover:-translate-y-1 border border-gray-100"
-            >
-              <div className="p-5">
-                {/* Image and Content Wrapper */}
-                <div className="flex gap-4 mb-4">
-                  {/* Image Container */}
-                  <div className="relative w-32 h-32 flex-shrink-0">
-                    <img 
-                      src={blog.img} 
-                      alt="" 
-                      className="w-full h-full rounded-lg object-cover transform group-hover:scale-105 
-                               transition-transform duration-300"
-                    />
-                  </div>
-
-                  {/* Content Container */}
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-text-primary group-hover:text-primary 
-                                 transition-colors duration-300 line-clamp-2 cursor-pointer mb-2">
-                      {blog.title}
-                    </h3>
-                    <p className="text-sm text-text-secondary/80 line-clamp-3">
-                      {blog.desc}
-                    </p>
+        {/* Results grid */}
+        {!isLoading && !error && filteredBlogs.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredBlogs.map((blog, index) => (
+              <article 
+                key={blog?._id || index}
+                onClick={() => handleBlogClick(blog?._id)}
+                className="group bg-white rounded-2xl overflow-hidden cursor-pointer
+                          shadow-[0_2px_10px_rgba(0,0,0,0.08)] 
+                          hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] 
+                          transition-all duration-300
+                          hover:-translate-y-1 border border-gray-100"
+              >
+                <div className="p-5">
+                  <div className="flex gap-4 mb-4">
+                    <div className="relative w-32 h-32 flex-shrink-0">
+                      <img 
+                        src={blog?.images?.[0] || '/placeholder-image.jpg'} 
+                        alt="" 
+                        className="w-full h-full rounded-lg object-cover transform group-hover:scale-105 
+                                 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-text-primary group-hover:text-primary 
+                                   transition-colors duration-300 line-clamp-2 mb-2">
+                        {blog?.title || 'Untitled'}
+                      </h3>
+                      <p className="text-sm text-text-secondary/80 line-clamp-3">
+                        {stripHtml(blog?.content)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
 
         {/* No results state */}
-        {searchTerm && filteredBlogs.length === 0 && (
+        {searchTerm && !isLoading && !error && filteredBlogs.length === 0 && (
           <div className="text-center py-20">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No results found</h3>
-            <p className="text-gray-500">Try adjusting your search terms</p>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              No results found
+            </h3>
+            <p className="text-gray-500">
+              Try adjusting your search terms
+            </p>
           </div>
         )}
       </div>
     </div>
   );
 }
+
+
+
+
+
