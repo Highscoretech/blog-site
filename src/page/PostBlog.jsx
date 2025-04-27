@@ -119,19 +119,20 @@ const PostBlog = () => {
       const compressedImages = await Promise.all(
         images.map(async (image) => {
           const compressed = await compressImage(image);
-          return convertImageToDataURL(compressed);
+          const dataUrl = await convertImageToDataURL(compressed);
+          return dataUrl; // This will be a base64 string
         })
       );
 
       const blogData = {
         title,
         content,
-        images: compressedImages
+        images: compressedImages // Array of base64 strings
       };
 
       await api.createBlog(blogData);
       toast.success('Blog posted successfully!');
-      clearForm(); // Clear all inputs after successful submission
+      clearForm();
       navigate('/blog');
     } catch (error) {
       toast.error(error.message || 'Failed to post blog. Please try again.');
@@ -254,6 +255,7 @@ const PostBlog = () => {
 };
 
 export default PostBlog;
+
 
 
 
