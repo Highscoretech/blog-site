@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: import.meta.env.DEV ? 'http://localhost:5000' : 'https://blogsitebackend-jsvo.onrender.com',
   timeout: 60000, // Increase timeout to 60 seconds for larger uploads
   headers: {
     'Content-Type': 'application/json',
